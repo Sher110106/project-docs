@@ -27,18 +27,18 @@ During initial exploration, we detected a major discrepancy in account metadata:
 
 To handle the scale of training ($40,729$ nodes, $605,727$ edges over $240$ days), we implemented two optimized pre-processing pipelines:
 
-### A. Vectorized NumPy Profile Assignment (Speedup: ~80x)
+### A. Vectorized NumPy Profile Assignment
 Populating the dense target behavioral matrix of shape `[240, 40729, 20]` using row-by-row iteration in pandas is highly inefficient. We constructed unified coordinate dictionaries (`user_to_idx` and `date_to_idx`) and executed a fully vectorized block assignment:
 ```python
 profiles_array[df['window'].map(date_to_idx).values, df['user_id'].map(user_to_idx).values, :] = df[dim_cols].values
 ```
-This reduced profile generation time from minutes to **under 7 seconds**.
+This reduced profile generation time to **under 7 seconds**.
 
-### B. Short-Circuited Temporal Hashtag Similarity (Speedup: ~1,000x)
+### B. Short-Circuited Temporal Hashtag Similarity
 The paper uses daily **Topic Similarity ($TS^{t_k}$)** between connected accounts based on hashtags. Computations on $605,727$ edges over $240$ days requires **145.3 million Jaccard set operations**, taking hours in pure Python.
 * **The Optimization:** We built a sparse daily hashtag index `user_daily_hashtags[day][user_id]` using PyArrow.
 * During Jaccard computation, we implemented an **active-user early short-circuit**. If on a given day $t_k$, either the source account $u_i$ or target account $u_j$ did not tweet any hashtags, similarity was immediately short-circuited to `0.0`.
-* Because tweeting is highly sparse daily, this short-circuited **99.5% of edges** immediately, dropping pre-processing execution from hours to **53 seconds**.
+* Because tweeting is highly sparse daily, this short-circuited **99.5% of edges** immediately, dropping pre-processing execution time to **53 seconds**.
 
 ---
 
@@ -48,21 +48,22 @@ We extracted exact paper features for context and edge representation:
 
 ### A. Context Features (25 Dims)
 We stacked the 20 behavioral indicators with 5 contextual attributes from profile metadata:
-1. **Verified ($VF_i \in \{0, 1\}$):** Account verification status.
-2. **Protected ($PT_i \in \{0, 1\}$):** Account privacy status.
-3. **Popularity ($Q_i$):** Min-max scaled global followers count.
-   $$Q_i = \frac{F_i - \min F}{\max F - \min F + 1e-8}$$
-4. **Daily Activity ($Ac^{t_k}_i \in \{0, 1\}$):** Binary indicator representing if the user posted a tweet on day $t_k$.
-5. **Daily Virality ($V^{t_k}_i$):** Vectorized summation of likes, retweets, replies, and quote counts received on day $t_k$.
+1. **Verified ($VF(i) \in \{0, 1\}$):** Account verification status.
+2. **Protected ($PT(i) \in \{0, 1\}$):** Account privacy status.
+3. **Popularity ($Q(i)$):** Min-max scaled global followers count.
+   $$Q(i) = \frac{F(i) - \min F}{\max F - \min F + 1e-8}$$
+4. **Daily Activity ($Ac^{t_k}(i) \in \{0, 1\}$):** Binary indicator representing if the user posted a tweet on day $t_k$.
+5. **Daily Virality ($V^{t_k}(i)$):** Vectorized summation of likes, retweets, replies, and quote counts received on day $t_k$.
 
 ### B. Edge Relationship Features (3 Dims)
-For each directed edge $e = (u_i, u_j)$, representing information flow from $u_i$ to $u_j$:
-1. **Social Profile Dominance ($SPD$):** Account popularity disparity.
-   $$SPD(u_i, u_j) = \frac{\text{Followers}(u_i) - \text{Followers}(u_j)}{\text{Followers}(u_i) + \text{Followers}(u_j) + 1e-6}$$
-2. **Network Power Dominance ($NPD$):** In-degree/out-degree discrepancy.
-   $$NPD(u_i, u_j) = \frac{\text{Out-Degree}(u_j) - \text{Out-Degree}(u_i)}{\text{Out-Degree}(u_j) + \text{Out-Degree}(u_i) + 1e-6}$$
+For each directed edge $e = (u(i), u(j))$, representing information flow from $u(i)$ to $u(j)$:
+1. **Social Profile Dominance ($SPD$):** Relative global profile followers disparity.
+   $$SPD(u(i), u(j)) = \frac{\text{Followers}(u(i))}{\text{Followers}(u(i)) + \text{Followers}(u(j))}$$
+2. **Network Power Dominance ($NPD$):** Social structural power ratio.
+   $$NP(i) = \frac{\text{In-Degree}(u(i))}{\text{Out-Degree}(u(i))}$$
+   $$NPD(u(i), u(j)) = \frac{NP(i)}{NP(j) + 1e-8}$$
 3. **Topic Similarity ($TS^{t_k}$):** Daily temporal Jaccard coefficient of shared hashtags.
-   $$TS^{t_k}(u_i, u_j) = \frac{|H_{u_i}^{t_k} \cap H_{u_j}^{t_k}|}{|H_{u_i}^{t_k} \cup H_{u_j}^{t_k}| + 1e-6}$$
+   $$TS^{t_k}(u(i), u(j)) = \frac{|H_{u(i)}^{t_k} \cap H_{u(j)}^{t_k}|}{|H_{u(i)}^{t_k} \cup H_{u(j)}^{t_k}| + 1e-6}$$
 
 ---
 
@@ -102,12 +103,12 @@ graph TD
     
     %% TSGAN v2 Split
     SIA_Out -->|TSGAN v2| Decs_v2[6 Specialized Task Decoders]
-    Decs_v2 -->|aggression_level| D1[Out: 3-dim]
-    Decs_v2 -->|aggression_type| D2[Out: 5-dim]
-    Decs_v2 -->|gender_bias| D3[Out: 3-dim]
-    Decs_v2 -->|religious_bias| D4[Out: 3-dim]
-    Decs_v2 -->|caste_bias| D5[Out: 3-dim]
-    Decs_v2 -->|ethnicity_bias| D6[Out: 3-dim]
+    Decs_v2 -->|aggression-level| D1[Out: 3-dim]
+    Decs_v2 -->|aggression-type| D2[Out: 5-dim]
+    Decs_v2 -->|gender-bias| D3[Out: 3-dim]
+    Decs_v2 -->|religious-bias| D4[Out: 3-dim]
+    Decs_v2 -->|caste-bias| D5[Out: 3-dim]
+    Decs_v2 -->|ethnicity-bias| D6[Out: 3-dim]
     
     D1 & D2 & D3 & D4 & D5 & D6 --> Concatenate[Concatenation Layer]
     Concatenate --> Pred_v2[Forecasting Output: B, F, N, 20]
@@ -116,7 +117,7 @@ graph TD
 ### A. TSGAN v1: Single Shared Decoder
 * **Decoder:** A single Multi-Layer Perceptron (MLP) mapping the latent representations directly to the 20-dimensional behavior target.
 * **Loss Function:** L1 loss (MAE) calculated across the entire 20-dimensional target vector at horizons $t+1$ and $t+2$ under supervision masks:
-  $$\mathcal{L}_{v1} = \text{masked\_MAE}(\hat{y}^{t+1}, y^{t+1}) + \text{masked\_MAE}(\hat{y}^{t+2}, y^{t+2})$$
+  $$\mathcal{L}_{v1} = \text{masked-MAE}(\hat{y}^{t+1}, y^{t+1}) + \text{masked-MAE}(\hat{y}^{t+2}, y^{t+2})$$
   *(Exactly **2 MAE terms** summed, yielding a loss scale of `~0.30 - 0.45`)*.
 
 ### B. TSGAN v2: Six Task-Specific Decoders
@@ -130,7 +131,7 @@ graph TD
   
   Outputs are dynamically concatenated back to form the final 20-dimensional vector.
 * **Multi-Task Loss Function:** Loss is calculated individually for **each task** across **both prediction horizons ($t+1$ and $t+2$)**:
-  $$\mathcal{L}_{v2} = \sum_{\text{task} \in \text{Tasks}} \left( \text{masked\_MAE}(\hat{y}^{t+1}_{\text{task}}, y^{t+1}_{\text{task}}) + \text{masked\_MAE}(\hat{y}^{t+2}_{\text{task}}, y^{t+2}_{\text{task}}) \right)$$
+  $$\mathcal{L}_{v2} = \sum_{\text{task} \in \text{Tasks}} \left( \text{masked-MAE}(\hat{y}^{t+1}_{\text{task}}, y^{t+1}_{\text{task}}) + \text{masked-MAE}(\hat{y}^{t+2}_{\text{task}}, y^{t+2}_{\text{task}}) \right)$$
   *(Exactly **12 MAE terms** summed, explaining why the v2 training logs display a mathematically inflated loss scale of `~1.70 - 2.80`)*.
 
 ---
