@@ -150,28 +150,43 @@ Both models are trained under a strict chronological split (Train: 165 days, Val
   * **Test MAE ($t+1$): `0.236299`**
   * **Test MAE ($t+2$): `0.224554`**
 
-### B. TSGAN v2 Training Results (ACTIVE)
-* **Status:** Actively training on epoch **Epoch 104/200**.
+#### B. TSGAN v2 Training Results (COMPLETED)
+* **Epochs run:** Early stopping triggered at **Epoch 133** (patience = 30) after validation loss plateaued.
 * **Best Validation Epoch:** **Epoch 103**
-  * **Best Val Loss:** **`1.729836`** (Sum of 12 task-specific MAEs)
+  * **Best Val Loss:** `1.729836` (Sum of 12 task-specific MAEs)
   * **Best Val MAE ($t+1$): `0.145172`**
   * **Best Val MAE ($t+2$): `0.143134`**
-* **Current Test Metrics:** *Pending final convergence of the active run.*
+* **Final Test Metrics (Epoch 103 Weights):**
+  * **Test MAE ($t+1$): `0.222763`**
+  * **Test MAE ($t+2$): `0.219206`**
 
 ---
 
-## 7. Preliminary Side-by-Side Comparison
+## 7. Final Side-by-Side Comparison & Task Breakdown
 
-| Metric | TSGAN v1 (Completed) | TSGAN v2 (Active - Epoch 104) | Performance & Architecture Summary |
+### A. Overall Evaluation Metrics (Chronological Test Set)
+
+| Metric | TSGAN v1 (Completed) | TSGAN v2 (Completed) | Performance & Architecture Summary |
 | :--- | :---: | :---: | :--- |
-| **Best Val Epoch** | Epoch 85 | **Epoch 103** | Both models demonstrate robust, stable training. |
-| **Best Val MAE ($t+1$)** | 0.148877 | **0.145172** | **TSGAN v2 outperforms v1** on horizon 1. |
-| **Best Val MAE ($t+2$)** | 0.146354 | **0.143134** | **TSGAN v2 outperforms v1** on horizon 2. |
-| **Test Set MAE ($t+1$)** | **0.236299** | *Pending* | Evaluated strictly on the unseen test set. |
-| **Test Set MAE ($t+2$)** | **0.224554** | *Pending* | Evaluated strictly on the unseen test set. |
+| **Best Val Epoch** | Epoch 85 | **Epoch 103** | Training was stable in both models, with v2 showing continuous progress. |
+| **Best Val MAE ($t+1$)** | 0.148877 | **0.145172** | **TSGAN v2 validation MAE is 2.5% lower** than v1 on horizon 1. |
+| **Best Val MAE ($t+2$)** | 0.146354 | **0.143134** | **TSGAN v2 validation MAE is 2.2% lower** than v1 on horizon 2. |
+| **Test Set MAE ($t+1$)** | 0.236299 | **0.222763** | **TSGAN v2 achieves a 5.7% error reduction** over v1 on unseen test data. |
+| **Test Set MAE ($t+2$)** | 0.224554 | **0.219206** | **TSGAN v2 achieves a 2.4% error reduction** over v1 on unseen test data. |
+
+### B. TSGAN v2 Task-Specific MAE Breakdown (Test Set)
+
+Evaluating the specialized decoders individually reveals the intrinsic predictability of different behavioral categories:
+
+| Behavioral Task | Target Dimensions | Test MAE ($t+1$) | Test MAE ($t+2$) | Task Predictability |
+| :--- | :---: | :---: | :---: | :--- |
+| **aggression_level** | `[0:3]` | 0.308645 | 0.306743 | **Hardest** (High temporal variance) |
+| **religious_bias** | `[11:14]` | 0.263553 | 0.261061 | **High Difficulty** (Dense clustering) |
+| **caste_bias** | `[14:17]` | 0.205198 | 0.199729 | **Moderate** |
+| **ethnicity_bias** | `[17:20]` | 0.194024 | 0.190303 | **Moderate / Low** |
+| **gender_bias** | `[8:11]` | 0.192810 | 0.186545 | **Moderate / Low** |
+| **aggression_type** | `[3:8]` | **0.172345** | **0.170853** | **Easiest** (Strong diffusion dynamics) |
 
 ### Technical Interpretation
 * **The Multi-Task Advantage:** TSGAN v2's split decoders are highly effective, outperforming the single-decoder configuration (v1) on both forecasting horizons ($t+1$ and $t+2$). By dividing the forecasting space into distinct tasks (aggression metrics vs. bias metrics), the GNN backbone's shared social representation is routed through specialized pathways, preventing high-variance aggression levels from dominating the learning signal of lower-variance biases.
 * **Representation Power:** The Graph Barlow Twins contrastive embeddings are remarkably powerful; the GCL representations combined with structured profile context features yield extremely high predictive accuracy, driving validation errors down to exceptionally low ranges ($0.143 - 0.145$).
-
----
