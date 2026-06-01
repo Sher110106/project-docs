@@ -53,11 +53,10 @@ We stacked the 20 behavioral indicators with 5 contextual attributes from profil
 3. **Popularity ($Q(i)$):** Min-max scaled global followers count.
    $$Q(i) = \frac{F(i) - \min F}{\max F - \min F + 10^{-8}}$$
 4. **Daily Activity ($Ac^{t_k}(i) \in \{0, 1\}$):** Binary indicator representing if the user posted a tweet on day $t_k$.
-5. **Daily Virality ($V^{t_k}(i)$):** Engagement rate scaled by normalized daily posts.
-   $$V^{t_k}(i) = \text{EngagementRate}^{t_k}(i) \cdot \text{NormPosts}^{t_k}(i)$$
+5. **Daily Virality ($V^{t_k}(i)$):** Timeframe-wise min-max scaled Engagement Rate.
+   $$V^{t_k}(i) = \frac{\text{EngagementRate}^{t_k}(i) - \min_j \text{EngagementRate}^{t_k}(j)}{\max_j \text{EngagementRate}^{t_k}(j) - \min_j \text{EngagementRate}^{t_k}(j) + 10^{-8}}$$
    where:
    $$\text{EngagementRate}^{t_k}(i) = \frac{\text{Likes}^{t_k}(i) + \text{Retweets}^{t_k}(i) + \text{Replies}^{t_k}(i) + \text{Quotes}^{t_k}(i)}{\text{Posts}^{t_k}(i) + 10^{-8}}$$
-   $$\text{NormPosts}^{t_k}(i) = \frac{\text{Posts}^{t_k}(i) - \min_j \text{Posts}^{t_k}(j)}{\max_j \text{Posts}^{t_k}(j) - \min_j \text{Posts}^{t_k}(j) + 10^{-8}}$$
 
 ### B. Edge Relationship Features (3 Dims)
 For each directed edge $e = (u(i), u(j))$, representing information flow from $u(i)$ to $u(j)$:
