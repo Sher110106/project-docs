@@ -21,6 +21,31 @@ During initial exploration, we detected a major discrepancy in account metadata:
 * **The Resolution:** This discrepancy is not database corruption. The profile followers counts represent **global Twitter statistics**, while our local CSV file represents the **locally tracked sub-graph** in our active database. 
 * To ensure paper replication, we computed graph connections strictly from the local CSV edges (`following_edges.csv.gz`), but leveraged the global profile statistics to calculate actual **Social Profile Dominance** and user **Popularity**, preserving real-world social status disparities.
 
+### 1.B Rigorous Cohort Trace & Missing Profile Analysis
+Through direct tracing of the pipeline on Tyrone, we resolved the exact tracking gap between the raw tweet active users and those in the daily profile window. 
+
+#### The Exact Cohort Reduction Path:
+1. **Graph-Active Raw Tweet Users:** **$48,291$** accounts exist in `nodes_tweet.parquet` who are also present in the active social graph.
+2. **Profile-Backed Users:** **$43,358$** accounts possess at least one day of behavior profile data in `user_windows_daily.csv`.
+3. **The Discrepancy (Missing Profiles):** Exactly **$4,933$** graph-active users who posted tweets were completely excluded from the behavior-profile dataset.
+4. **Final Strict Cohort ($40,729$):** The final model cohort of **$40,729$** users is a further narrowing of the $43,358$ profile-backed users, requiring that they satisfy the strict following edge condition (having a valid follower relationship in our local $605,727$ follow edges sub-graph).
+
+#### Why the $4,933$ Users Disappeared:
+To identify why these $4,933$ users were lost, we performed a full audit:
+* **Raw Tweets Scanned:** Checked all **$941,449$** tweets authored by these $18,848$ profile-less users.
+* **Prediction Artifact Analysis:** Scanned all **$483,030,154$** prediction rows in `predictions_threshold_0.6_20251207_191716.json`.
+* **The Result:** Exactly **$0$** of their tweet IDs were found in the prediction file. 
+
+This confirms these users were not excluded due to having "too few tweets" for profile construction. Rather, their tweet IDs never reached the prediction artifact.
+
+#### Upstream Language Filtering:
+Scanning the language distribution of the **$941,449$** raw tweets for these missing-profile users revealed the cause:
+* `ja` (Japanese): **$814,895$** tweets (**$86.6\%$**)
+* `und` (Undefined): **$75,922$** tweets (**$8.1\%$**)
+* `qme` / `qht` / `fr` / `ar`: **$34,831$** tweets
+
+The upstream classification model used a language filter or eligibility criteria that excluded non-English/non-Indic languages (like Japanese), completely filtering out these tweets before behavior prediction. As a result, no 20-dimensional behavior vectors could be built for them.
+
 ---
 
 ## 2. High-Performance Engineering & Pre-processing Optimizations
