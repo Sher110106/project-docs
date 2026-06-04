@@ -95,6 +95,42 @@
 - Test MAE was worse than fixed TSGAN V2, especially at `t+2`.
 - Test MSE was lower than fixed TSGAN V2, but this is not directly apples-to-apples because STGCN used `H=12` while fixed TSGAN used `H=2`.
 
+## DCRNN
+
+### Kept Same
+
+- Same strict `40,729` user cohort.
+- Same social graph scale: `40,729` nodes and `605,727` directed edges.
+- Same target: behavior dimensions `5:25`, full `20`-dim profile.
+- Same forecast target: `t+1` and `t+2`.
+- Same chronological train/validation/test split style.
+- Same final reporting style: MAE/MSE for `t+1` and `t+2`, plus per-task metrics.
+
+### Changed
+
+- Cloned and inspected the original `liyaguang/DCRNN` implementation.
+- Did not use the original TensorFlow 1.x code path because it depends on old `tensorflow.contrib` APIs.
+- Built standalone `DCRNN_indic` in PyTorch, keeping the paper mechanics:
+  - directed graph diffusion
+  - dual random-walk supports
+  - max diffusion step `2`
+  - DCGRU encoder-decoder
+  - scheduled sampling with inverse-sigmoid decay
+  - two recurrent layers
+  - hidden size `64`
+  - Adam with learning-rate drops at epochs `20,30,40,50`
+  - masked MAE training loss
+  - z-score normalization
+- Used the paper-style longer history setting `H=12`, forecasting `F=2`.
+- Adapted the output from traffic speed to six behavior tasks covering the full `20`-dim profile.
+
+### Main Outcome
+
+- DCRNN completed all `100` epochs cleanly.
+- Best validation was the final epoch, epoch `100`.
+- Test metrics were the best so far across both MAE and MSE.
+- This is the strongest paper-backed baseline currently tested, but it is still not a strict apples-to-apples comparison with fixed TSGAN because DCRNN used `H=12` while the fixed TSGAN runs used `H=2`.
+
 ## Results Table
 
 | Run | History | Decoder / Heads | Loss Used | Status | Test MAE t+1 | Test MAE t+2 | Test MSE t+1 | Test MSE t+2 |
@@ -102,12 +138,15 @@
 | Fixed TSGAN V1 | 2 | single 20-d decoder | MAE train, MSE tracked | completed | 0.236584 | 0.227865 | 0.163480 | 0.149031 |
 | Fixed TSGAN V2 | 2 | six task decoders | MAE train, MSE tracked | completed | **0.234852** | **0.227157** | 0.173603 | 0.165608 |
 | Fixed TSGAN V2 + PCGrad | 2 | six task decoders | PCGrad over six task MAE losses | interrupted, best checkpoint tested | 0.246170 | 0.239650 | 0.184860 | 0.178771 |
-| Sparse STGCN 20-d | 12 | six task heads | MSE/L2 | completed, early stop epoch 68 | 0.240788 | 0.242641 | **0.118587** | **0.120166** |
+| Sparse STGCN 20-d | 12 | six task heads | MSE/L2 | completed, early stop epoch 68 | 0.240788 | 0.242641 | 0.118587 | 0.120166 |
+| Sparse DCRNN 20-d | 12 | six task outputs from DCGRU seq2seq | masked MAE | completed, epoch 100 | **0.105701** | **0.110732** | **0.082055** | **0.087803** |
 
 ## Interpretation
 
-- Best test MAE: fixed TSGAN V2.
-- Best test MSE: sparse STGCN, but it used longer history and MSE training.
+- Best test MAE: sparse DCRNN 20-d.
+- Best test MSE: sparse DCRNN 20-d.
 - PCGrad was technically valid but not beneficial in this run.
-- STGCN is a genuine paper-backed baseline, but not a direct TSGAN replacement on MAE from this first run.
-- Next fair comparison would rerun TSGAN with `H=12` or rerun STGCN with `H=2` as an ablation.
+- STGCN is a genuine paper-backed baseline, but DCRNN is much stronger on this first run.
+- DCRNN is the current best candidate for the next paper-backed comparison, especially because it models directed diffusion explicitly.
+- The main caveat is comparison fairness: STGCN and DCRNN used `H=12`, while fixed TSGAN and PCGrad used `H=2`.
+- Next fair comparison would rerun TSGAN with `H=12`, or rerun STGCN/DCRNN with `H=2` as ablations.
