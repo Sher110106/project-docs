@@ -198,6 +198,74 @@ Run output: outputs_dcrnn/v2_20d_dual_random_walk
 - Test MSE was `0.082055 / 0.087803` for `t+1 / t+2`.
 - This is currently the strongest completed paper-backed baseline on both MAE and MSE.
 
+## GPT-ST
+
+Source being replicated:
+
+```text
+Paper: GPT-ST: Generative Pre-Training of Spatio-Temporal Graph Neural Networks
+Authors: Zhonghang Li, Lianghao Xia, Yong Xu, Chao Huang
+Venue/year: NeurIPS 2023
+Local paper: papers/2311.04245v1.pdf
+Reference repo: https://github.com/HKUDS/GPT-ST.git
+Local clone: GPT-ST
+Inspected commit: b50c64d347ab9d565189523bf621ecb4e4a1ab8c
+Pretrain output: outputs_gptst/pretrain_20d
+Downstream output: outputs_gptst/stgcn_20d
+```
+
+### Similarities With GPT-ST Paper/Code
+
+- Preserved GPT-ST as a pretraining framework, not as a standalone forecaster.
+- Preserved the paper's two-stage workflow:
+  - masked autoencoder pretraining
+  - frozen pretrained encoder used during downstream forecasting
+- Preserved random masking before the adaptive masking phase.
+- Preserved adaptive cluster-aware masking after `change_epoch`.
+- Preserved masked reconstruction MAE during pretraining.
+- Preserved KL cluster guidance loss during adaptive masking.
+- Preserved the customized temporal encoder with time-conditioned and node-specific parameters.
+- Preserved the hierarchical spatial encoder:
+  - hypergraph capsule clustering
+  - dynamic routing
+  - cross-cluster relation learning
+- Preserved gated fusion between GPT-ST embeddings and raw projected input.
+- Used the paper-style history length:
+  - history `H=12`
+- Used the paper/code hidden and hypergraph settings where feasible:
+  - hidden dim `64`
+  - embed dim `16`
+  - spatial embed dim `4`
+  - `HS=10`
+  - `HT=16`
+  - `HT_Tem=8`
+  - `num_route=2`
+  - mask ratio `0.25`
+
+### Differences From GPT-ST Paper/Code
+
+- The original task predicts traffic flow/speed/demand. Our task predicts the `20`-dim social-behavior profile.
+- The original data loaders expect traffic `.npz` files. Our loader reads:
+  - `profiles_exact.npy`
+  - `edge_index.npy`
+  - `edge_attr_static.npy`
+  - `mask_next1.npy`
+  - `mask_next2.npy`
+- The original traffic time features were replaced with deterministic daily/coarse time features derived from the 240 profile windows.
+- The original repo baselines are not designed for the full `40,729` node graph, so the downstream stage uses our sparse STGCN backend.
+- The original code contained hard-coded `cuda:0` tensor placement; the Indic port uses device-aware tensor placement.
+- An unused multi-GB guide tensor allocation was removed because it does not affect the forward computation and is too costly on the full cohort.
+- The output target was changed from single-channel traffic values to behavior dimensions `5:25`.
+
+### Outcome
+
+- GPT-ST pretraining completed `50` epochs.
+- GPT-ST + sparse STGCN downstream training completed `50` epochs and early-stopped.
+- Test MAE was `0.119965 / 0.123982` for `t+1 / t+2`.
+- Test MSE was `0.060330 / 0.063691` for `t+1 / t+2`.
+- GPT-ST strongly improved the sparse STGCN baseline.
+- GPT-ST + STGCN is worse than DCRNN on MAE but better than DCRNN on MSE.
+
 ## Results Table
 
 | Run | Paper/code matched | History | Decoder / Heads | Loss Used | Status | Test MAE t+1 | Test MAE t+2 | Test MSE t+1 | Test MSE t+2 |
@@ -206,14 +274,17 @@ Run output: outputs_dcrnn/v2_20d_dual_random_walk
 | Fixed TSGAN V2 | TSGAN | 2 | six task decoders | MAE train, MSE tracked | completed | 0.234852 | 0.227157 | 0.173603 | 0.165608 |
 | Fixed TSGAN V2 + PCGrad | TSGAN + PCGrad | 2 | six task decoders | PCGrad over six task MAE losses | interrupted, best checkpoint tested | 0.246170 | 0.239650 | 0.184860 | 0.178771 |
 | Sparse STGCN 20-d | STGCN | 12 | six task heads | MSE/L2 | completed, early stop epoch 68 | 0.240788 | 0.242641 | 0.118587 | 0.120166 |
-| Sparse DCRNN 20-d | DCRNN | 12 | 20-d DCGRU seq2seq output | masked MAE | completed, epoch 100 | **0.105701** | **0.110732** | **0.082055** | **0.087803** |
+| Sparse DCRNN 20-d | DCRNN | 12 | 20-d DCGRU seq2seq output | masked MAE | completed, epoch 100 | **0.105701** | **0.110732** | 0.082055 | 0.087803 |
+| GPT-ST + Sparse STGCN 20-d | GPT-ST + STGCN | 12 | frozen GPT-ST encoder + gated fusion + six STGCN task heads | GPT-ST masked MAE pretrain, downstream MSE/L2 | completed, early stop epoch 50 | 0.119965 | 0.123982 | **0.060330** | **0.063691** |
 
 ## Interpretation
 
 - The model sections above should be read as replication notes: each one compares our implementation to that model's own paper/code.
-- Best completed run so far: sparse DCRNN 20-d.
-- DCRNN is strongest on both MAE and MSE, and it is a good fit because the original method explicitly models directed diffusion.
+- Best test MAE so far: sparse DCRNN 20-d.
+- Best test MSE so far: GPT-ST + sparse STGCN 20-d.
+- DCRNN remains the strongest MAE model and is a good fit because the original method explicitly models directed diffusion.
+- GPT-ST + STGCN substantially improves the plain sparse STGCN baseline and is the strongest MSE model so far.
 - STGCN is a valid paper-backed baseline, but its original dense graph implementation had to be replaced with a sparse graph layer to run on the full cohort.
 - PCGrad was technically valid but did not improve TSGAN V2 in the evaluated run.
 - Fairness caveat: TSGAN and PCGrad used `H=2`, while STGCN and DCRNN used `H=12`.
-- Next fair ablation should either rerun TSGAN with `H=12` or rerun STGCN/DCRNN with `H=2`.
+- Next fair ablation should either rerun TSGAN with `H=12` or rerun STGCN/DCRNN/GPT-ST with `H=2`.
