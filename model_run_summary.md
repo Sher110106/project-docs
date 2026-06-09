@@ -266,6 +266,110 @@ Downstream output: outputs_gptst/stgcn_20d
 - GPT-ST strongly improved the sparse STGCN baseline.
 - GPT-ST + STGCN is worse than DCRNN on MAE but better than DCRNN on MSE.
 
+## ST-SSDL
+
+Source being replicated:
+
+```text
+Paper: How Different from the Past? Spatio-Temporal Time Series Forecasting with Self-Supervised Deviation Learning
+Authors: Haotian Gao, Zheng Dong, Jiawei Yong, Shintaro Fukushima, Kenjiro Taura, Renhe Jiang
+Venue/year: NeurIPS 2025
+Local paper: papers/2510.04908v1.pdf
+Reference repo: https://github.com/Jimmy-7664/ST-SSDL
+Local clone: ST-SSDL
+Inspected commit: a98331d
+Run output: outputs_stssdl/v2_20d_sparse
+```
+
+### Similarities With ST-SSDL Paper/Code
+
+- Preserved current-window and historical-anchor modeling.
+- Preserved the self-supervised deviation learning objective.
+- Preserved the learned prototype bank.
+- Preserved query-to-prototype attention.
+- Preserved contrastive prototype learning.
+- Preserved current-vs-anchor deviation loss.
+- Preserved recurrent graph encoder/decoder structure.
+- Used paper-style history length:
+  - history `H=12`
+- Used the same strict full cohort:
+  - `40,729` users
+  - `605,727` edges
+
+### Differences From ST-SSDL Paper/Code
+
+- The original code predicts single-channel traffic series. Our target is the `20`-dim behavior profile.
+- The original code builds dense static and adaptive `N x N` graph supports. On our graph, one dense float32 support is about `6.6 GB` before gradients and recurrent intermediates.
+- Dense adaptive graph construction was replaced with sparse adaptive edge weighting over observed social edges.
+- The traffic weekly historical average was adapted to same-day-of-week profile anchors.
+- 5-minute time-of-day embeddings were replaced with daily-period embeddings.
+- The first full run used reduced width for the full 40k-user graph:
+  - hidden dim `32`
+  - prototype dim `32`
+  - input embedding dim `32`
+  - node embedding dim `16`
+  - adaptive embedding dim `16`
+
+### Outcome
+
+- ST-SSDL completed and stopped after `39` epochs.
+- Best validation was epoch `9`.
+- Test MAE was `0.118757 / 0.122973` for `t+1 / t+2`.
+- Test MSE was `0.083344 / 0.088382` for `t+1 / t+2`.
+
+## D2STGNN
+
+Source being replicated:
+
+```text
+Paper: Decoupled Dynamic Spatial-Temporal Graph Neural Network for Traffic Forecasting
+Authors: Zezhi Shao, Zhao Zhang, Wei Wei, Fei Wang, Yongjun Xu, Xin Cao, Christian S. Jensen
+Venue/year: PVLDB 2022
+Local paper: papers/2206.09112v4.pdf
+Reference repo: https://github.com/zezhishao/D2STGNN
+Local clone: D2STGNN
+Inspected commit: 82c2d38
+Run output: outputs_d2stgnn/v2_20d_sparse
+```
+
+### Similarities With D2STGNN Paper/Code
+
+- Preserved the Decoupled Spatial-Temporal Framework.
+- Preserved diffusion-first and inherent-second branch ordering.
+- Preserved estimation gate with node and time embeddings.
+- Preserved residual decomposition after diffusion and inherent blocks.
+- Preserved dynamic graph learning from current hidden states.
+- Preserved separate diffusion and inherent forecast hidden states before final regression.
+- Preserved localized temporal diffusion with:
+  - temporal kernel `Kt=3`
+  - spatial order `Ks=2`
+- Used paper-style history length:
+  - history `H=12`
+
+### Differences From D2STGNN Paper/Code
+
+- The original code predicts single-channel traffic values. Our target is the `20`-dim behavior profile.
+- The original implementation creates dense static adaptive and dynamic `N x N` graph tensors:
+  - `Softmax(ReLU(E_d E_u^T))`
+  - `torch.bmm(Q, K^T)`
+- Dense all-pairs graphs are infeasible for the full `40,729`-user graph, so the Indic port uses sparse message passing over observed social edges.
+- The dynamic graph learner was adapted to compute edge weights only for existing edges.
+- The original traffic loader was replaced with the common `data/tsgan_inputs` loader.
+- 5-minute traffic time embeddings were replaced with daily-period embeddings.
+- The first full run used reduced width:
+  - hidden dim `32`
+  - node dim `16`
+  - forecast dim `64`
+  - layers `2`
+
+### Outcome
+
+- D2STGNN queued correctly after ST-SSDL and completed.
+- Training early-stopped at epoch `99`.
+- Best validation was epoch `69`.
+- Test MAE was `0.103274 / 0.111521` for `t+1 / t+2`.
+- Test MSE was `0.080714 / 0.089098` for `t+1 / t+2`.
+
 ## Results Table
 
 | Run | Paper/code matched | History | Decoder / Heads | Loss Used | Status | Test MAE t+1 | Test MAE t+2 | Test MSE t+1 | Test MSE t+2 |
@@ -274,17 +378,23 @@ Downstream output: outputs_gptst/stgcn_20d
 | Fixed TSGAN V2 | TSGAN | 2 | six task decoders | MAE train, MSE tracked | completed | 0.234852 | 0.227157 | 0.173603 | 0.165608 |
 | Fixed TSGAN V2 + PCGrad | TSGAN + PCGrad | 2 | six task decoders | PCGrad over six task MAE losses | interrupted, best checkpoint tested | 0.246170 | 0.239650 | 0.184860 | 0.178771 |
 | Sparse STGCN 20-d | STGCN | 12 | six task heads | MSE/L2 | completed, early stop epoch 68 | 0.240788 | 0.242641 | 0.118587 | 0.120166 |
-| Sparse DCRNN 20-d | DCRNN | 12 | 20-d DCGRU seq2seq output | masked MAE | completed, epoch 100 | **0.105701** | **0.110732** | 0.082055 | 0.087803 |
+| Sparse DCRNN 20-d | DCRNN | 12 | 20-d DCGRU seq2seq output | masked MAE | completed, epoch 100 | 0.105701 | **0.110732** | 0.082055 | 0.087803 |
 | GPT-ST + Sparse STGCN 20-d | GPT-ST + STGCN | 12 | frozen GPT-ST encoder + gated fusion + six STGCN task heads | GPT-ST masked MAE pretrain, downstream MSE/L2 | completed, early stop epoch 50 | 0.119965 | 0.123982 | **0.060330** | **0.063691** |
+| Sparse ST-SSDL 20-d | ST-SSDL | 12 | sparse adaptive recurrent decoder, 20-d output | forecast MAE + contrastive + deviation losses | completed, stopped epoch 39 | 0.118757 | 0.122973 | 0.083344 | 0.088382 |
+| Sparse D2STGNN 20-d | D2STGNN | 12 | decoupled diffusion/inherent sparse branches, 20-d output | masked MAE | completed, early stop epoch 99 | **0.103274** | 0.111521 | 0.080714 | 0.089098 |
 
 ## Interpretation
 
 - The model sections above should be read as replication notes: each one compares our implementation to that model's own paper/code.
-- Best test MAE so far: sparse DCRNN 20-d.
+- Best test MAE t+1 so far: sparse D2STGNN 20-d.
+- Best test MAE t+2 so far: sparse DCRNN 20-d by a narrow margin.
 - Best test MSE so far: GPT-ST + sparse STGCN 20-d.
-- DCRNN remains the strongest MAE model and is a good fit because the original method explicitly models directed diffusion.
+- DCRNN remains the most consistently strong diffusion baseline and is a good fit because the original method explicitly models directed diffusion.
+- D2STGNN is now the strongest t+1 MAE model and is close to DCRNN at t+2 MAE.
+- ST-SSDL is competitive with GPT-ST on MAE but does not improve on DCRNN or D2STGNN.
 - GPT-ST + STGCN substantially improves the plain sparse STGCN baseline and is the strongest MSE model so far.
 - STGCN is a valid paper-backed baseline, but its original dense graph implementation had to be replaced with a sparse graph layer to run on the full cohort.
+- ST-SSDL and D2STGNN required the same dense-to-sparse graph adaptation because their original dynamic graph modules materialize all-pairs `N x N` tensors.
 - PCGrad was technically valid but did not improve TSGAN V2 in the evaluated run.
-- Fairness caveat: TSGAN and PCGrad used `H=2`, while STGCN and DCRNN used `H=12`.
-- Next fair ablation should either rerun TSGAN with `H=12` or rerun STGCN/DCRNN/GPT-ST with `H=2`.
+- Fairness caveat: TSGAN and PCGrad used `H=2`, while STGCN, DCRNN, GPT-ST, ST-SSDL, and D2STGNN used `H=12`.
+- Next fair ablation should either rerun TSGAN with `H=12` or rerun the later baselines with `H=2`.
