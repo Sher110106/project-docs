@@ -370,6 +370,63 @@ Run output: outputs_d2stgnn/v2_20d_sparse
 - Test MAE was `0.103274 / 0.111521` for `t+1 / t+2`.
 - Test MSE was `0.080714 / 0.089098` for `t+1 / t+2`.
 
+## UniST
+
+Source being replicated:
+
+```text
+Paper: UniST: A Prompt-Empowered Universal Model for Urban Spatio-Temporal Prediction
+Authors: Yuan Yuan, Jingtao Ding, Jie Feng, Depeng Jin, Yong Li
+Venue/year: KDD 2024
+Local paper: papers/2402.11838
+Reference repo: https://github.com/tsinghua-fib-lab/UniST
+Local clone: UniST
+Inspected commit: 6ee69db00d8f67e550f9bc3c06f004f9f7885703
+Run output: outputs_unist/v2_20d_pseudogrid
+```
+
+### Similarities With UniST Paper/Code
+
+- Preserved UniST's patch-based spatial tokenization.
+- Preserved temporal and spatial positional conditioning.
+- Preserved encoder/decoder transformer structure.
+- Preserved future mask-token decoding.
+- Preserved prompt-style future conditioning.
+- Used the same `H=12`, `F=2` comparison setup as STGCN, DCRNN, GPT-ST, ST-SSDL, and D2STGNN.
+
+### Differences From UniST Paper/Code
+
+- The official UniST implementation is grid-first. Our data is a user graph, not an urban grid.
+- To keep minimal code changes and preserve the released UniST mechanics, users were packed into a deterministic padded pseudo-grid:
+  - `40,729` users
+  - `208 x 208` padded cells
+  - `patch_size=16`
+  - `169` spatial patches per time step
+- The social graph edges are not used by this first UniST run.
+- The original scalar urban target was replaced with behavior dimensions `5:25`, giving the same `20`-dim target used by the other baselines.
+- Loss and metrics use the same `mask_next1.npy` and `mask_next2.npy` masks as the other runs.
+
+### Outcome
+
+- UniST completed and early-stopped at epoch `38`.
+- Best validation was epoch `13`.
+- Test MAE was `0.147103 / 0.148617` for `t+1 / t+2`.
+- Test MSE was `0.085215 / 0.086991` for `t+1 / t+2`.
+- UniST improves substantially over sparse STGCN on MAE, but it does not beat DCRNN or D2STGNN on MAE.
+
+## Baseline Code Availability
+
+| Requested baseline | Paper / method identified | Code availability found | Our status |
+|---|---|---|---|
+| `https://github.com/VeritasYin/STGCN_IJCAI-18` | STGCN | Available | Completed |
+| `https://github.com/liyaguang/dcrnn` | DCRNN | Available | Completed |
+| `https://arxiv.org/pdf/2402.11838` | UniST | Available: `https://github.com/tsinghua-fib-lab/UniST` | Completed |
+| `https://arxiv.org/pdf/2311.04245v1` | GPT-ST | Available: `https://github.com/HKUDS/GPT-ST` | Completed |
+| `https://arxiv.org/abs/2510.04908` | ST-SSDL | Available: `https://github.com/Jimmy-7664/ST-SSDL` | Completed |
+| `https://arxiv.org/pdf/2206.09112` | D2STGNN | Available: `https://github.com/GestaltCogTeam/D2STGNN` | Completed |
+| NeurIPS 2020 hash `3fe78a8acf5fda99de95303940a2420c` | PCGrad | Available: `https://github.com/tianheyu927/PCGrad` | Implemented; interrupted best checkpoint tested |
+| `https://arxiv.org/pdf/2504.00721` | MinGRE / zero-inflated adversarial spatiotemporal graph learning | No clear official code repo found in search | Not run |
+
 ## Results Table
 
 | Run | Paper/code matched | History | Decoder / Heads | Loss Used | Status | Test MAE t+1 | Test MAE t+2 | Test MSE t+1 | Test MSE t+2 |
@@ -382,6 +439,7 @@ Run output: outputs_d2stgnn/v2_20d_sparse
 | GPT-ST + Sparse STGCN 20-d | GPT-ST + STGCN | 12 | frozen GPT-ST encoder + gated fusion + six STGCN task heads | GPT-ST masked MAE pretrain, downstream MSE/L2 | completed, early stop epoch 50 | 0.119965 | 0.123982 | **0.060330** | **0.063691** |
 | Sparse ST-SSDL 20-d | ST-SSDL | 12 | sparse adaptive recurrent decoder, 20-d output | forecast MAE + contrastive + deviation losses | completed, stopped epoch 39 | 0.118757 | 0.122973 | 0.083344 | 0.088382 |
 | Sparse D2STGNN 20-d | D2STGNN | 12 | decoupled diffusion/inherent sparse branches, 20-d output | masked MAE | completed, early stop epoch 99 | **0.103274** | 0.111521 | 0.080714 | 0.089098 |
+| UniST 20-d pseudo-grid | UniST | 12 | patch transformer over padded user pseudo-grid, 20-d output | masked MSE | completed, early stop epoch 38 | 0.147103 | 0.148617 | 0.085215 | 0.086991 |
 
 ## Interpretation
 
@@ -391,10 +449,13 @@ Run output: outputs_d2stgnn/v2_20d_sparse
 - Best test MSE so far: GPT-ST + sparse STGCN 20-d.
 - DCRNN remains the most consistently strong diffusion baseline and is a good fit because the original method explicitly models directed diffusion.
 - D2STGNN is now the strongest t+1 MAE model and is close to DCRNN at t+2 MAE.
+- UniST is a valid completed foundation-model baseline; it improves over sparse STGCN but is weaker than DCRNN, D2STGNN, GPT-ST, and ST-SSDL on MAE.
 - ST-SSDL is competitive with GPT-ST on MAE but does not improve on DCRNN or D2STGNN.
 - GPT-ST + STGCN substantially improves the plain sparse STGCN baseline and is the strongest MSE model so far.
 - STGCN is a valid paper-backed baseline, but its original dense graph implementation had to be replaced with a sparse graph layer to run on the full cohort.
 - ST-SSDL and D2STGNN required the same dense-to-sparse graph adaptation because their original dynamic graph modules materialize all-pairs `N x N` tensors.
+- UniST did not require dense graph adaptation because it is grid/patch based; the main adaptation was packing graph users into a pseudo-grid.
 - PCGrad was technically valid but did not improve TSGAN V2 in the evaluated run.
-- Fairness caveat: TSGAN and PCGrad used `H=2`, while STGCN, DCRNN, GPT-ST, ST-SSDL, and D2STGNN used `H=12`.
+- The only requested baseline where I did not find a clear official code repo is `arXiv:2504.00721` / MinGRE.
+- Fairness caveat: TSGAN and PCGrad used `H=2`, while STGCN, DCRNN, GPT-ST, ST-SSDL, D2STGNN, and UniST used `H=12`.
 - Next fair ablation should either rerun TSGAN with `H=12` or rerun the later baselines with `H=2`.
