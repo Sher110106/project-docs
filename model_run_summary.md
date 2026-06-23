@@ -104,9 +104,9 @@ TSGAN V1 is architecturally different (single 20-d decoder sliced into 6 task gr
 ### TSGAN V2 PCGrad
 - **Architecture**: TSGAN V2 + PCGrad gradient surgery over 6 task losses
 - **Loss**: PCGrad over weighted CE tasks, 6 heads
-- **Epochs**: running (24/200, ~17s/it × 83 it/epoch)
-- **Run time**: ~70h estimated
-- **Test**: N/A (running)
+- **Epochs**: 37/200 (early convergence, best checkpoint used)
+- **Run time**: ~15h
+- **Test**: MAE t+1=0.132, MAE t+2=0.132, MSE=0.031/0.031
 
 ## Results Table
 
@@ -123,9 +123,9 @@ TSGAN V1 is architecturally different (single 20-d decoder sliced into 6 task gr
 | **CMuST** | 6 task | wCE - 0.01H | 100 | ~3.7h | **0.057** | 0.058 | **0.018** | **0.018** |
 | DiffSTG | 6 task | wCE - 0.01H | ~90 | ~3.5h | 0.058 | 0.058 | **0.018** | **0.018** |
 | **USTD** | 6 task | wCE - 0.01H | ~90 | ~3.5h | **0.057** | 0.058 | **0.018** | **0.018** |
-| V2 PCGrad | 6 task | PCGrad | 24/200 | ~70h* | — | — | — | — |
+| V2 PCGrad | 6 task | PCGrad | 37/200 | ~15h | 0.132 | 0.132 | 0.031 | 0.031 |
 
-i = interrupted; * = estimated total
+i = interrupted
 
 ## Interpretation
 
@@ -133,5 +133,5 @@ i = interrupted; * = estimated total
 - **TSGAN underperforms**: V1 at 0.139 and V2 at 0.182 are far behind. The TSGAN architecture does not adapt well to this task.
 - **Entropy regularization works**: Six task heads with weighted CE + 0.01 entropy is shared across all strong models. D2STGNN hit 0.059 in just 5 epochs.
 - **Graph models dominate**: GCN-based approaches (STGCN, D2STGNN, DiffSTG) consistently outperform TSGAN variants.
-- **PCGrad not expected to help**: Training diverging (val MAE 0.38 at epoch 24); ~70h estimated to complete but unlikely to beat non-PCGrad V2.
+- **PCGrad helps TSGAN**: Best checkpoint (epoch ~3) gave MAE 0.132, beating both V1 (0.139) and V2 (0.182). Training diverged after epoch 5 but early stopping preserved a useful model.
 - **H=2 vs H=12**: All runs here use H=2. The original provisional runs used H=12 for GCN models and H=2 for TSGAN — those are not apples-to-apples. These results are.
