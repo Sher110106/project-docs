@@ -127,6 +127,25 @@ TSGAN V1 is architecturally different (single 20-d decoder sliced into 6 task gr
 
 i = interrupted
 
+## Per-Task MAE t+1
+
+| Model | Overall | Aggr Level | Aggr Type | Gender | Religious | Caste | Ethnicity |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| USTD | **0.057** | 0.144 | 0.070 | 0.018 | 0.065 | 0.029 | **0.016** |
+| CMuST | **0.057** | 0.144 | 0.070 | 0.019 | 0.066 | **0.028** | 0.017 |
+| UniST | 0.058 | **0.143** | **0.070** | 0.021 | 0.068 | 0.029 | 0.018 |
+| DiffSTG | 0.058 | 0.146 | 0.071 | **0.018** | **0.065** | 0.029 | 0.017 |
+| STGCN | 0.059 | 0.150 | 0.073 | 0.020 | 0.069 | **0.028** | **0.016** |
+| D2STGNN | 0.059 | 0.154 | 0.075 | **0.018** | **0.065** | 0.029 | **0.016** |
+| DCRNN | 0.060 | 0.153 | 0.074 | 0.021 | 0.068 | 0.030 | 0.017 |
+| GPT-ST+STGCN | 0.062 | 0.161 | 0.079 | 0.019 | 0.068 | 0.030 | 0.017 |
+| ST-SSDL | 0.071 | 0.179 | 0.088 | 0.022 | 0.081 | 0.035 | 0.020 |
+| V2 PCGrad | 0.132 | 0.205 | 0.155 | 0.102 | 0.133 | 0.106 | 0.092 |
+| TSGAN V1 | 0.139 | 0.186 | 0.135 | 0.125 | 0.139 | 0.125 | 0.125 |
+| TSGAN V2 | 0.182 | 0.197 | 0.185 | 0.132 | 0.153 | 0.197 | 0.230 |
+
+Gender bias and ethnicity bias are the easiest tasks (MAE < 0.02 for all GCN models); aggression level is hardest (0.14–0.18). Top models converge within ~0.06 on hard tasks and are nearly identical on easy ones.
+
 ## Interpretation
 
 - **Top performers**: USTD and CMuST tied at MAE t+1=0.057. All top-5 models (USTD, CMuST, UniST, DiffSTG, STGCN/D2STGNN) cluster tightly between 0.057–0.060.
